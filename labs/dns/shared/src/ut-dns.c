@@ -10,7 +10,13 @@
 #define DNS_PORT 53
 #define BUFFER_SIZE 2048 
 
-
+/*
+|---------------------NOTE---------------------|
+| I have not used clinet_addr,                 |
+| I don't know what the difference between     |
+| that and server_addr is                      |
+|---------------------NOTE---------------------|
+*/
 
 int main() {
     /* A few variable declarations that might be useful */
@@ -58,9 +64,9 @@ int main() {
     // creating utexas.edu zone
     TDNSCreateZone(ctx, "utexas.edu");
     // add an IP address for www.utexas.edu
-    TDNSAddRecord(ctx, "utexas.edu", "www", "40.0.0.10", NULL)
+    TDNSAddRecord(ctx, "utexas.edu", "www", "40.0.0.10", NULL);
     // add UTCS nameserver
-    TDNSAddRecord(ctx, "utexas.edu", "cs", NULL, "ns.cs.utexas.edu")
+    TDNSAddRecord(ctx, "utexas.edu", "cs", NULL, "ns.cs.utexas.edu");
     TDNSAddRecord(ctx, "cs.utexas.edu", "ns", "50.0.0.30", NULL);
 
     /* 5. Receive a message continuously and parse it using TDNSParseMsg() */

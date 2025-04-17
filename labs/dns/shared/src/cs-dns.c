@@ -23,22 +23,91 @@ int main() {
     /* PART1 TODO: Implement a DNS nameserver for the cs.utexas.edu zone */
     
     /* 1. Create an **UDP** socket */
+    // socket ( IPv4, UPD, Protocol)
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
 
     /* 2. Initialize server address (INADDR_ANY, DNS_PORT) */
     /* Then bind the socket to it */
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(DNS_PORT);
+
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
     /* 3. Initialize a server context using TDNSInit() */
     /* This context will be used for future TDNS library function calls */
+    struct TDNSServerContext * ctx = TDNSInit(); 
+    if (!ctx) {
+        perror("TDNSInit failed\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
     /* 4. Create the cs.utexas.edu zone using TDNSCreateZone() */
     /* Add an IP address for cs.utexas.edu domain using TDNSAddRecord() */
     /* Add an IP address for aquila.cs.utexas.edu domain using TDNSAddRecord() */
+    
+    // creating cs.utexas.edu zone
+    TDNSCreateZone(ctx, "cs.utexas.edu");
+
+    // add UTCS nameserver
+    // A records
+    TDNSAddRecord(ctx, "cs.utexas.edu", "", "50.0.0.10", NULL);
+    TDNSAddRecord(ctx, "cs.utexas.edu", "aquila", "50.0.0.20", NULL);
+    TDNSAddRecord(ctx, "cs.utexas.edu", "ns", "50.0.0.30", NULL);
+    // NS record
+    TDNSAddRecord(ctx, "cs.utexas.edu", "", NULL, "ns.cs.utexas.edu");
+
 
     /* 5. Receive a message continuously and parse it using TDNSParseMsg() */
+    while (1) {
+        ssize_t n = recvfrom(sockfd,
+                             buffer,
+                             BUFFER_SIZE,
+                             0,
+                             (struct sockaddr*)&client_addr,
+                             &client_len);
+        if (n < 0) {
+            perror("recvfrom");
+            continue;
+        }
+
+        struct TDNSParseResult parsed;
+        /* parse: 0==query, 1==response */
+        if (TDNSParseMsg(buffer, n, &parsed) == TDNS_RESPONSE) {
+            continue;  /* ignore incoming responses */
+        }
+
+        /* only handle A, AAAA, NS queries */
+        if (parsed.qtype == A ||
+            parsed.qtype == AAAA ||
+            parsed.qtype == NS) {
+            struct TDNSFindResult result;
+            if (TDNSFind(ctx, &parsed, &result)) {
+                /* send back the serialized DNS response */
+                if (sendto(sockfd,
+                           result.serialized,
+                           result.len,
+                           0,
+                           (struct sockaddr*)&client_addr,
+                           client_len) < 0) {
+                    perror("sendto");
+                }
+            }
+        }
+        /* else: ignore unsupported query types */
+    }
 
     /* 6. If it is a query for A, AAAA, NS DNS record */
     /* find the corresponding record using TDNSFind() and send the response back */
     /* Otherwise, just ignore it. */
-
+    close(sockfd);
     return 0;
 }
